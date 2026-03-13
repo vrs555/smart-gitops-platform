@@ -11,7 +11,7 @@ metadata:
     gitops/managed: "true"
     gitops/repo: "smart-gitops-platform"
 spec:
-  replicas: 3
+  replicas: 4
   selector:
     matchLabels:
       app: gitops-demo-app
