@@ -1,0 +1,526 @@
+<!-- dashboard/templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart GitOps Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f1923;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
+            padding: 20px 30px;
+            border-bottom: 2px solid #3182ce;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #63b3ed;
+        }
+
+        .header .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .status-healthy { background: #22543d; color: #68d391; }
+        .status-warning { background: #744210; color: #f6e05e; }
+        .status-critical { background: #742a2a; color: #fc8181; }
+        .status-unknown { background: #4a5568; color: #a0aec0; }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: #1a2332;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2d3748;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            font-size: 16px;
+            color: #63b3ed;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2d3748;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .metric-item {
+            background: #0f1923;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-item .label {
+            font-size: 11px;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric-item .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e2e8f0;
+            margin-top: 4px;
+        }
+
+        .metric-item .value.danger { color: #fc8181; }
+        .metric-item .value.warning { color: #f6e05e; }
+        .metric-item .value.good { color: #68d391; }
+
+        .log-list {
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            padding: 6px 10px;
+            border-bottom: 1px solid #2d3748;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .log-entry:nth-child(odd) { background: #0f1923; }
+
+        .pod-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            margin-bottom: 6px;
+            background: #0f1923;
+            border-radius: 6px;
+        }
+
+        .pod-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .pod-dot.running { background: #68d391; }
+        .pod-dot.pending { background: #f6e05e; }
+        .pod-dot.failed { background: #fc8181; }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            margin: 4px;
+        }
+
+        .btn-danger {
+            background: #742a2a;
+            color: #fc8181;
+            border: 1px solid #fc8181;
+        }
+
+        .btn-primary {
+            background: #2a4365;
+            color: #63b3ed;
+            border: 1px solid #63b3ed;
+        }
+
+        .btn:hover { opacity: 0.8; }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #2d3748;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .full-width { grid-column: 1 / -1; }
+
+        .refresh-info {
+            text-align: center;
+            padding: 10px;
+            color: #718096;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Smart GitOps Dashboard</h1>
+        <div>
+            <span id="health-badge" class="status-badge status-unknown">
+                LOADING...
+            </span>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <!-- Controller Status -->
+        <div class="card">
+            <h2>⚙️ Controller Status</h2>
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="label">Status</div>
+                    <div class="value good" id="ctrl-status">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Current Commit</div>
+                    <div class="value" id="ctrl-commit">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Total Deploys</div>
+                    <div class="value" id="ctrl-deploys">0</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Total Rollbacks</div>
+                    <div class="value" id="ctrl-rollbacks">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Metrics -->
+        <div class="card">
+            <h2>📊 Live Metrics</h2>
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="label">Error Rate</div>
+                    <div class="value" id="metric-error">0%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="error-bar"
+                             style="width:0%;background:#fc8181"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Response Time</div>
+                    <div class="value" id="metric-response">0s</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="response-bar"
+                             style="width:0%;background:#f6e05e"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">CPU Usage</div>
+                    <div class="value" id="metric-cpu">0%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-bar"
+                             style="width:0%;background:#63b3ed"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Memory Usage</div>
+                    <div class="value" id="metric-memory">0%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-bar"
+                             style="width:0%;background:#b794f4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Analysis -->
+        <div class="card">
+            <h2>🤖 AI Anomaly Detection</h2>
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="label">Model Status</div>
+                    <div class="value" id="ai-status">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Method</div>
+                    <div class="value" id="ai-method" 
+                         style="font-size:14px">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Anomaly Score</div>
+                    <div class="value" id="ai-score">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Recent Anomalies</div>
+                    <div class="value" id="ai-anomalies">0/0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pods Status -->
+        <div class="card">
+            <h2>🐳 Pod Status</h2>
+            <div id="pods-container">
+                <p style="color:#718096">Loading pods...</p>
+            </div>
+        </div>
+
+        <!-- Deployment History -->
+        <div class="card">
+            <h2>📜 Deployment History</h2>
+            <div class="log-list" id="deploy-history">
+                <p style="color:#718096;padding:10px">Loading...</p>
+            </div>
+        </div>
+
+        <!-- Rollback History -->
+        <div class="card">
+            <h2>🔄 Rollback History</h2>
+            <div class="log-list" id="rollback-history">
+                <p style="color:#718096;padding:10px">No rollbacks yet</p>
+            </div>
+            <div style="margin-top:15px">
+                <button class="btn btn-danger" onclick="forceRollback()">
+                    ⚠️ Force Rollback
+                </button>
+                <button class="btn btn-primary" onclick="trainAI()">
+                    🧠 Retrain AI
+                </button>
+            </div>
+        </div>
+
+        <!-- Git Sync Status -->
+        <div class="card full-width">
+            <h2>🔗 Git Sync Status</h2>
+            <div class="metric-grid" style="grid-template-columns:repeat(4,1fr)">
+                <div class="metric-item">
+                    <div class="label">Branch</div>
+                    <div class="value" id="git-branch" 
+                         style="font-size:16px">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Last Commit</div>
+                    <div class="value" id="git-commit" 
+                         style="font-size:16px">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Total Syncs</div>
+                    <div class="value" id="git-syncs">0</div>
+                </div>
+                <div class="metric-item">
+                    <div class="label">Last Sync</div>
+                    <div class="value" id="git-last-sync" 
+                         style="font-size:12px">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="refresh-info">
+        Auto-refreshing every 5 seconds | 
+        <span id="last-update">--</span>
+    </div>
+
+    <script>
+        const CONTROLLER_API = 'http://localhost:8080/api';
+
+        async function fetchData() {
+            try {
+                const response = await fetch(`${CONTROLLER_API}/status`);
+                if (!response.ok) throw new Error('API unavailable');
+                const data = await response.json();
+                updateDashboard(data);
+            } catch (error) {
+                console.error('Failed to fetch data:', error);
+                document.getElementById('health-badge').textContent = 'DISCONNECTED';
+                document.getElementById('health-badge').className = 
+                    'status-badge status-unknown';
+            }
+        }
+
+        function updateDashboard(data) {
+            // Controller Status
+            const ctrl = data.controller || {};
+            document.getElementById('ctrl-status').textContent = 
+                ctrl.status || '--';
+            document.getElementById('ctrl-commit').textContent = 
+                ctrl.current_commit || '--';
+            document.getElementById('ctrl-deploys').textContent = 
+                ctrl.total_deployments || 0;
+            document.getElementById('ctrl-rollbacks').textContent = 
+                ctrl.total_rollbacks || 0;
+
+            // Health Badge
+            const health = data.health || {};
+            const healthStatus = health.health_status || 'UNKNOWN';
+            const badge = document.getElementById('health-badge');
+            badge.textContent = healthStatus;
+            badge.className = 'status-badge status-' + healthStatus.toLowerCase();
+
+            // Live Metrics
+            const metrics = health.latest_metrics || {};
+            updateMetric('metric-error', metrics.error_rate, '%', 20, 10);
+            updateMetric('metric-response', metrics.response_time, 's', 2, 1);
+            updateMetric('metric-cpu', metrics.cpu_usage, '%', 90, 75);
+            updateMetric('metric-memory', metrics.memory_usage, '%', 90, 80);
+
+            // Progress bars
+            setBar('error-bar', metrics.error_rate || 0);
+            setBar('response-bar', 
+                Math.min((metrics.response_time || 0) * 33, 100));
+            setBar('cpu-bar', metrics.cpu_usage || 0);
+            setBar('memory-bar', metrics.memory_usage || 0);
+
+            // AI Status
+            const ai = data.ai || {};
+            document.getElementById('ai-status').textContent = 
+                ai.model_trained ? 'TRAINED' : 'LEARNING';
+            document.getElementById('ai-status').className = 
+                'value ' + (ai.model_trained ? 'good' : 'warning');
+            document.getElementById('ai-method').textContent = 
+                ai.method || '--';
+            document.getElementById('ai-score').textContent = 
+                ai.avg_anomaly_score || '--';
+            document.getElementById('ai-anomalies').textContent = 
+                ai.recent_anomalies || '0/0';
+
+            // Pods
+            const pods = data.pods || [];
+            const podsContainer = document.getElementById('pods-container');
+            if (pods.length > 0) {
+                podsContainer.innerHTML = pods.map(pod => `
+                    <div class="pod-status">
+                        <div class="pod-dot ${
+                            pod.phase === 'Running' ? 'running' : 
+                            pod.phase === 'Pending' ? 'pending' : 'failed'
+                        }"></div>
+                        <span style="flex:1;font-size:13px">${pod.name}</span>
+                        <span style="font-size:12px;color:#718096">
+                            ${pod.phase} | 
+                            Restarts: ${pod.restart_count}
+                        </span>
+                    </div>
+                `).join('');
+            }
+
+            // Git Status
+            const git = data.git || {};
+            document.getElementById('git-branch').textContent = 
+                git.branch || '--';
+            document.getElementById('git-commit').textContent = 
+                git.last_commit || '--';
+            document.getElementById('git-syncs').textContent = 
+                git.total_syncs || 0;
+
+            // Deployment History
+            const deployHist = 
+                (data.deployment && data.deployment.history) || [];
+            const deployEl = document.getElementById('deploy-history');
+            if (deployHist.length > 0) {
+                deployEl.innerHTML = deployHist.slice(-10).reverse()
+                    .map(d => `
+                    <div class="log-entry">
+                        <span>${d.timestamp?.substring(11, 19) || ''}</span>
+                        <span>${d.manifests_applied} applied</span>
+                        <span style="color:${
+                            d.status === 'success' ? '#68d391' : '#fc8181'
+                        }">${d.status}</span>
+                    </div>
+                `).join('');
+            }
+
+            // Rollback History
+            const rollbacks = (data.rollback && 
+                data.rollback.rollback_history) || [];
+            const rollbackEl = document.getElementById('rollback-history');
+            if (rollbacks.length > 0) {
+                rollbackEl.innerHTML = rollbacks.slice(-10).reverse()
+                    .map(r => `
+                    <div class="log-entry">
+                        <span>${r.timestamp?.substring(11, 19) || ''}</span>
+                        <span>${r.reason?.substring(0, 40) || ''}...</span>
+                        <span style="color:${
+                            r.success ? '#68d391' : '#fc8181'
+                        }">${r.success ? 'OK' : 'FAIL'}</span>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('last-update').textContent = 
+                new Date().toLocaleTimeString();
+        }
+
+        function updateMetric(id, value, suffix, dangerThreshold, warnThreshold) {
+            const el = document.getElementById(id);
+            const v = value || 0;
+            el.textContent = v + suffix;
+            el.className = 'value ' + (
+                v >= dangerThreshold ? 'danger' : 
+                v >= warnThreshold ? 'warning' : 'good'
+            );
+        }
+
+        function setBar(id, percentage) {
+            document.getElementById(id).style.width = 
+                Math.min(percentage, 100) + '%';
+        }
+
+        async function forceRollback() {
+            if (!confirm('Are you sure you want to force a rollback?')) return;
+            try {
+                const response = await fetch(
+                    `${CONTROLLER_API}/force-rollback`, 
+                    { method: 'POST' }
+                );
+                const result = await response.json();
+                alert(result.success ? 
+                    'Rollback initiated!' : 
+                    'Rollback failed: ' + JSON.stringify(result));
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function trainAI() {
+            try {
+                const response = await fetch(
+                    `${CONTROLLER_API}/train-ai`, 
+                    { method: 'POST' }
+                );
+                const result = await response.json();
+                alert(result.success ? 
+                    'AI model retrained!' : 
+                    'Not enough data yet');
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        // Auto-refresh every 5 seconds
+        setInterval(fetchData, 5000);
+        fetchData();
+    </script>
+</body>
+</html>

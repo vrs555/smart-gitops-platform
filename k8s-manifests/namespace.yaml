@@ -1,0 +1,8 @@
+# k8s-manifests/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smart-gitops
+  labels:
+    app: smart-gitops
+    managed-by: gitops-controller
